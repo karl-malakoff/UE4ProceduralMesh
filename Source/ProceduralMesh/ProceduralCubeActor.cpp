@@ -15,119 +15,102 @@ AProceduralCubeActor::AProceduralCubeActor()
 	mesh->SetMaterial(0, Material.Object);
 
 	// Generate a cube
-	TArray<FProceduralMeshTriangle> triangles;
-	GenerateCube(100.f, triangles);
-	mesh->SetProceduralMeshTriangles(triangles);
+	FProceduralMeshData data;
+	GenerateCube(100.f, data);
+	mesh->SetMeshData(data);
 
 	RootComponent = mesh;
 }
 
 // Generate a full cube
-void AProceduralCubeActor::GenerateCube(const float& InSize, TArray<FProceduralMeshTriangle>& OutTriangles)
+void AProceduralCubeActor::GenerateCube(const float& InSize, FProceduralMeshData& OutData)
 {
 	// The 8 vertices of the cube
-	FVector p0 = FVector(	0.f,	0.f,	0.f);
-	FVector p1 = FVector(	0.f,	0.f, InSize);
-	FVector p2 = FVector(InSize,	0.f, InSize);
-	FVector p3 = FVector(InSize,	0.f,	0.f);
-	FVector p4 = FVector(InSize, InSize,	0.f);
-	FVector p5 = FVector(InSize, InSize, InSize);
-	FVector p6 = FVector(	0.f, InSize, InSize);
-	FVector p7 = FVector(	0.f, InSize,	0.f);
+	OutData.VertexPositions.Add( FVector(	0.f,	0.f,	0.f));	//0
+	OutData.VertexPositions.Add( FVector(   0.f,    0.f, InSize));  //1
+	OutData.VertexPositions.Add( FVector(InSize,    0.f, InSize));  //2
+	OutData.VertexPositions.Add( FVector(InSize,    0.f,    0.f));  //3
+	OutData.VertexPositions.Add( FVector(InSize, InSize,    0.f));  //4
+	OutData.VertexPositions.Add( FVector(InSize, InSize, InSize));  //5
+	OutData.VertexPositions.Add( FVector(   0.f, InSize, InSize));  //6
+	OutData.VertexPositions.Add( FVector(	0.f, InSize,	0.f));  //7
 
-	FProceduralMeshVertex v0;
-	FProceduralMeshVertex v1;
-	FProceduralMeshVertex v2;
-	FProceduralMeshVertex v3;
-	v0.U = 0.f; v0.V = 0.f;
-	v1.U = 0.f; v1.V = 1.f;
-	v2.U = 1.f; v2.V = 1.f;
-	v3.U = 1.f; v3.V = 0.f;
+	//add color
+	OutData.VertexColors.Append(&FColor::Red, 8);
+
+	FProceduralMeshVertexUV uv0(0.f, 0.f);
+	FProceduralMeshVertexUV uv1(0.f, 1.f);
+	FProceduralMeshVertexUV uv2(1.f, 1.f);
+	FProceduralMeshVertexUV uv3(1.f, 0.f);
 
 	FProceduralMeshTriangle t1;
 	FProceduralMeshTriangle t2;
 
+	//set UVs for tiangles
+	t1.UV0 = uv0;
+	t1.UV1 = uv1;
+	t1.UV2 = uv2;
+	t2.UV0 = uv0;
+	t2.UV1 = uv2; 
+	t2.UV2 = uv3;
+
 	// front face
-	v0.Position = p0;
-	v1.Position = p1;
-	v2.Position = p2;
-	v3.Position = p3;
-	t1.Vertex0 = v0;
-	t1.Vertex1 = v1;
-	t1.Vertex2 = v2;
-	t2.Vertex0 = v0;
-	t2.Vertex1 = v2;
-	t2.Vertex2 = v3;
-	OutTriangles.Add(t1);
-	OutTriangles.Add(t2);
+	t1.Vertex0 = 0;
+	t1.Vertex1 = 1;
+	t1.Vertex2 = 2;
+	t2.Vertex0 = 0;
+	t2.Vertex1 = 2;
+	t2.Vertex2 = 3;
+	OutData.Triangles.Add(t1);
+	OutData.Triangles.Add(t2);
 
 	// back face
-	v0.Position = p4;
-	v1.Position = p5;
-	v2.Position = p6;
-	v3.Position = p7;
-	t1.Vertex0 = v0;
-	t1.Vertex1 = v1;
-	t1.Vertex2 = v2;
-	t2.Vertex0 = v0;
-	t2.Vertex1 = v2;
-	t2.Vertex2 = v3;
-	OutTriangles.Add(t1);
-	OutTriangles.Add(t2);
+	t1.Vertex0 = 4;
+	t1.Vertex1 = 5;
+	t1.Vertex2 = 6;
+	t2.Vertex0 = 4;
+	t2.Vertex1 = 6;
+	t2.Vertex2 = 7;
+	OutData.Triangles.Add(t1);
+	OutData.Triangles.Add(t2);
 
 	// left face
-	v0.Position = p7;
-	v1.Position = p6;
-	v2.Position = p1;
-	v3.Position = p0;
-	t1.Vertex0 = v0;
-	t1.Vertex1 = v1;
-	t1.Vertex2 = v2;
-	t2.Vertex0 = v0;
-	t2.Vertex1 = v2;
-	t2.Vertex2 = v3;
-	OutTriangles.Add(t1);
-	OutTriangles.Add(t2);
+	t1.Vertex0 = 7;
+	t1.Vertex1 = 6;
+	t1.Vertex2 = 1;
+	t2.Vertex0 = 7;
+	t2.Vertex1 = 1;
+	t2.Vertex2 = 0;
+	OutData.Triangles.Add(t1);
+	OutData.Triangles.Add(t2);
 
 	// right face
-	v0.Position = p3;
-	v1.Position = p2;
-	v2.Position = p5;
-	v3.Position = p4;
-	t1.Vertex0 = v0;
-	t1.Vertex1 = v1;
-	t1.Vertex2 = v2;
-	t2.Vertex0 = v0;
-	t2.Vertex1 = v2;
-	t2.Vertex2 = v3;
-	OutTriangles.Add(t1);
-	OutTriangles.Add(t2);
+	t1.Vertex0 = 3;
+	t1.Vertex1 = 2;
+	t1.Vertex2 = 5;
+	t2.Vertex0 = 3;
+	t2.Vertex1 = 5;
+	t2.Vertex2 = 4;
+	OutData.Triangles.Add(t1);
+	OutData.Triangles.Add(t2);
 
 	// top face
-	v0.Position = p1;
-	v1.Position = p6;
-	v2.Position = p5;
-	v3.Position = p2;
-	t1.Vertex0 = v0;
-	t1.Vertex1 = v1;
-	t1.Vertex2 = v2;
-	t2.Vertex0 = v0;
-	t2.Vertex1 = v2;
-	t2.Vertex2 = v3;
-	OutTriangles.Add(t1);
-	OutTriangles.Add(t2);
+	t1.Vertex0 = 1;
+	t1.Vertex1 = 6;
+	t1.Vertex2 = 5;
+	t2.Vertex0 = 1;
+	t2.Vertex1 = 5;
+	t2.Vertex2 = 2;
+	OutData.Triangles.Add(t1);
+	OutData.Triangles.Add(t2);
 
 	// bottom face
-	v0.Position = p3;
-	v1.Position = p4;
-	v2.Position = p7;
-	v3.Position = p0;
-	t1.Vertex0 = v0;
-	t1.Vertex1 = v1;
-	t1.Vertex2 = v2;
-	t2.Vertex0 = v0;
-	t2.Vertex1 = v2;
-	t2.Vertex2 = v3;
-	OutTriangles.Add(t1);
-	OutTriangles.Add(t2);
+	t1.Vertex0 = 3;
+	t1.Vertex1 = 4;
+	t1.Vertex2 = 7;
+	t2.Vertex0 = 3;
+	t2.Vertex1 = 7;
+	t2.Vertex2 = 0;
+	OutData.Triangles.Add(t1);
+	OutData.Triangles.Add(t2);
 }

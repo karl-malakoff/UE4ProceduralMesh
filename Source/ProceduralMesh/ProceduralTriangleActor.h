@@ -10,7 +10,7 @@
  * 
  */
 UCLASS()
-class PROCEDURALMESH_API AProceduralTriangleActor : public AActor
+class PROCEDURALMESH_API  AProceduralTriangleActor : public AActor
 {
 	GENERATED_BODY()
 
@@ -21,5 +21,5 @@ public:
 	UPROPERTY(VisibleAnywhere, Category=Materials)
 	UProceduralMeshComponent* mesh;
 
-	void GenerateTriangle(TArray<FProceduralMeshTriangle>& OutTriangles);
+	void GenerateTriangle(FProceduralMeshData& OutData);
 };

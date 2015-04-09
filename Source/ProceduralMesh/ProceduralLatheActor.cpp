@@ -29,15 +29,15 @@ AProceduralLatheActor::AProceduralLatheActor()
 	points.Add(FVector( 0, 40, 0));
 
 	// Generate a Lathe from rotating the given points
-	TArray<FProceduralMeshTriangle> triangles;
-	GenerateLathe(points, 128, triangles);
-	mesh->SetProceduralMeshTriangles(triangles);
+	FProceduralMeshData data;
+	GenerateLathe(points, 128, data);
+	mesh->SetMeshData(data);
 
 	RootComponent = mesh;
 }
 
 // Generate a lathe by rotating the given polyline
-void AProceduralLatheActor::GenerateLathe(const TArray<FVector>& InPoints, const int InSegments, TArray<FProceduralMeshTriangle>& OutTriangles)
+void AProceduralLatheActor::GenerateLathe(const TArray<FVector>& InPoints, const int InSegments, FProceduralMeshData& OutData)
 {
 	UE_LOG(LogClass, Log, TEXT("AProceduralLatheActor::Lathe POINTS %d"), InPoints.Num());
 
@@ -67,6 +67,10 @@ void AProceduralLatheActor::GenerateLathe(const TArray<FVector>& InPoints, const
 	y' = y
 	*/
 
+
+	int32 NumOfVertices = InPoints.Num() * InSegments + 2; //puls 2 fpr first and last point
+	OutData.VertexColors.Append(&FColor::Blue, NumOfVertices);
+
 	// Working point array, in which we keep the rotated line we draw with
 	TArray<FVector> wp;
 	for(int i = 0; i < InPoints.Num(); i++)
@@ -78,51 +82,61 @@ void AProceduralLatheActor::GenerateLathe(const TArray<FVector>& InPoints, const
 	FVector p0(wp[0].X, 0, 0);
 	FVector pLast(wp[wp.Num() - 1].X, 0, 0);
 
+	OutData.VertexPositions.Add(p0);
+
 	FProceduralMeshTriangle tri;
 	// for each segment draw the OutTriangles clockwise for normals pointing out or counterclockwise for the opposite (this here does CW)
+	// for each segment create the vertices and colors
 	for(int segment = 0; segment<InSegments; segment++)
 	{
-
+		int32 SegmentRow = segment	 * InPoints.Num();
+		int32 SegmentNextRow = (segment < InSegments - 1) ?	(segment + 1) * InPoints.Num() : 0;
 		for(int i = 0; i<InPoints.Num() - 1; i++)
 		{
-			FVector p1 = wp[i];
-			FVector p2 = wp[i + 1];
-			FVector p1r(p1.X, p1.Y*cosA - p1.Z*sinA, p1.Y*sinA + p1.Z*cosA);
-			FVector p2r(p2.X, p2.Y*cosA - p2.Z*sinA, p2.Y*sinA + p2.Z*cosA);
+			//wraps around at end!
+			int32 p1 = SegmentRow + i + 1;
+			int32 p2 = SegmentRow + i + 2;
+			int32 p1r = SegmentNextRow + i + 1;
+			int32 p2r = SegmentNextRow + i + 2;
+			FVector p1v = wp[i];
+			FVector p2v = wp[i + 1];
+			FVector p1rv(p1v.X, p1v.Y*cosA - p1v.Z*sinA, p1v.Y*sinA + p1v.Z*cosA);
 
-			static const FColor Red(255, 51, 51);
-			tri.Vertex0.Color = Red;
-			tri.Vertex1.Color = Red;
-			tri.Vertex2.Color = Red;
-
+			//don't add vertex if i = 0
 			if(i == 0)
 			{
-				tri.Vertex0.Position = p1;
-				tri.Vertex1.Position = p0;
-				tri.Vertex2.Position = p1r;
-				OutTriangles.Add(tri);
+				tri.Vertex0 = p1;
+				tri.Vertex1 = 0;
+				tri.Vertex2 = p1r;
+				OutData.Triangles.Add(tri);
 			}
 
-			tri.Vertex0.Position = p1;
-			tri.Vertex1.Position = p1r;
-			tri.Vertex2.Position = p2;
-			OutTriangles.Add(tri);
+			tri.Vertex0 = p1;
+			tri.Vertex1 = p1r;
+			tri.Vertex2 = p2;
+			OutData.Triangles.Add(tri);
 
-			tri.Vertex0.Position = p2;
-			tri.Vertex1.Position = p1r;
-			tri.Vertex2.Position = p2r;
-			OutTriangles.Add(tri);
+			tri.Vertex0 = p2;
+			tri.Vertex1 = p1r;
+			tri.Vertex2 = p2r;
+			OutData.Triangles.Add(tri);
 
+			OutData.VertexPositions.Add(wp[i]);
+			wp[i] = p1rv;
+
+			//this has to go here to mainatin add order for vertex positions
 			if(i == InPoints.Num() - 2)
 			{
-				tri.Vertex0.Position = p2;
-				tri.Vertex1.Position = p2r;
-				tri.Vertex2.Position = pLast;
-				OutTriangles.Add(tri);
-				wp[i + 1] = p2r;
+				FVector p2rv(p2v.X, p2v.Y*cosA - p2v.Z*sinA, p2v.Y*sinA + p2v.Z*cosA);
+				tri.Vertex0 = p2;
+				tri.Vertex1 = p2r;
+				tri.Vertex2 = NumOfVertices - 1;
+				OutData.Triangles.Add(tri);
+				OutData.VertexPositions.Add(wp[i + 1]);
+				wp[i + 1] = p2rv;
 			}
-
-			wp[i] = p1r;
 		}
 	}
+
+	OutData.VertexPositions.Add(pLast);
 }

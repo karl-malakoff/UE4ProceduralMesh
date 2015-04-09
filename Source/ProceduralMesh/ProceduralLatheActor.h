@@ -10,7 +10,7 @@
  * 
  */
 UCLASS()
-class PROCEDURALMESH_API AProceduralLatheActor : public AActor
+class PROCEDURALMESH_API   AProceduralLatheActor : public AActor
 {
 	GENERATED_BODY()
 
@@ -21,5 +21,5 @@ public:
 	UPROPERTY(VisibleAnywhere, Category=Materials)
 	UProceduralMeshComponent* mesh;
 
-	void GenerateLathe(const TArray<FVector>& InPoints, const int InSegments, TArray<FProceduralMeshTriangle>& OutTriangles);
+	void GenerateLathe(const TArray<FVector>& InPoints, const int InSegments, FProceduralMeshData& OutData);
 };

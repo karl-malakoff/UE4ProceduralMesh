@@ -7,6 +7,28 @@
 #include "ProceduralMeshComponent.h"
 #include "Runtime/Launch/Resources/Version.h"
 
+void FProceduralMeshData::ResetTriangles()
+{
+	Triangles.Reset();
+}
+
+void FProceduralMeshData::ResetVertices()
+{
+	VertexPositions.Reset();
+	VertexColors.Reset();
+}
+
+int32 FProceduralMeshData::TrianglesNum() const
+{
+	return Triangles.Num();
+}
+
+int32 FProceduralMeshData::VerteciesNum() const
+{
+	return VertexPositions.Num();
+}
+
+
 /** Vertex Buffer */
 class FProceduralMeshVertexBuffer : public FVertexBuffer
 {
@@ -85,39 +107,43 @@ public:
 		: FPrimitiveSceneProxy(Component)
 		, MaterialRelevance(Component->GetMaterialRelevance(GetScene().GetFeatureLevel()))
 	{
-		// Add each triangle to the vertex/index buffer
-		for(int TriIdx = 0; TriIdx<Component->ProceduralMeshTris.Num(); TriIdx++)
-		{
-			FProceduralMeshTriangle& Tri = Component->ProceduralMeshTris[TriIdx];
 
-			const FVector Edge01 = (Tri.Vertex1.Position - Tri.Vertex0.Position);
-			const FVector Edge02 = (Tri.Vertex2.Position - Tri.Vertex0.Position);
+		// Add each triangle to the vertex/index buffer
+		for (int TriIdx = 0; TriIdx<Component->MeshData.TrianglesNum(); TriIdx++)
+		{
+			FProceduralMeshTriangle& Tri = Component->MeshData.Triangles[TriIdx];
+			TArray<FVector>& VertexPositions = Component->MeshData.VertexPositions;
+			TArray<FColor>& VertexColors = Component->MeshData.VertexColors;
+
+
+			const FVector Edge01 = (VertexPositions[Tri.Vertex1] - VertexPositions[Tri.Vertex0]);
+			const FVector Edge02 = (VertexPositions[Tri.Vertex2] - VertexPositions[Tri.Vertex0]);
 
 			const FVector TangentX = Edge01.GetSafeNormal();
 			const FVector TangentZ = (Edge02 ^ Edge01).GetSafeNormal();
 			const FVector TangentY = (TangentX ^ TangentZ).GetSafeNormal();
 
 			FDynamicMeshVertex Vert0;
-			Vert0.Position = Tri.Vertex0.Position;
-			Vert0.Color = Tri.Vertex0.Color;
+			Vert0.Position = VertexPositions[Tri.Vertex0];
+			Vert0.Color = VertexColors[Tri.Vertex0];
 			Vert0.SetTangents(TangentX, TangentY, TangentZ);
-			Vert0.TextureCoordinate.Set(Tri.Vertex0.U, Tri.Vertex0.V);
+			Vert0.TextureCoordinate.Set(Tri.UV0.U, Tri.UV0.V);
 			int32 VIndex = VertexBuffer.Vertices.Add(Vert0);
 			IndexBuffer.Indices.Add(VIndex);
 
 			FDynamicMeshVertex Vert1;
-			Vert1.Position = Tri.Vertex1.Position;
-			Vert1.Color = Tri.Vertex1.Color;
+			Vert1.Position = VertexPositions[Tri.Vertex1];
+			Vert1.Color = VertexColors[Tri.Vertex1];
 			Vert1.SetTangents(TangentX, TangentY, TangentZ);
-			Vert1.TextureCoordinate.Set(Tri.Vertex1.U, Tri.Vertex1.V);
+			Vert1.TextureCoordinate.Set(Tri.UV1.U, Tri.UV1.V);
 			VIndex = VertexBuffer.Vertices.Add(Vert1);
 			IndexBuffer.Indices.Add(VIndex);
 
 			FDynamicMeshVertex Vert2;
-			Vert2.Position = Tri.Vertex2.Position;
-			Vert2.Color = Tri.Vertex2.Color;
+			Vert2.Position = VertexPositions[Tri.Vertex2];
+			Vert2.Color = VertexColors[Tri.Vertex2];
 			Vert2.SetTangents(TangentX, TangentY, TangentZ);
-			Vert2.TextureCoordinate.Set(Tri.Vertex2.U, Tri.Vertex2.V);
+			Vert2.TextureCoordinate.Set(Tri.UV2.U, Tri.UV2.V);
 			VIndex = VertexBuffer.Vertices.Add(Vert2);
 			IndexBuffer.Indices.Add(VIndex);
 		}
@@ -279,29 +305,62 @@ UProceduralMeshComponent::UProceduralMeshComponent(const FObjectInitializer& Obj
 	SetCollisionProfileName(UCollisionProfile::BlockAllDynamic_ProfileName);
 }
 
-bool UProceduralMeshComponent::SetProceduralMeshTriangles(const TArray<FProceduralMeshTriangle>& Triangles)
+bool UProceduralMeshComponent::SetMeshData(const FProceduralMeshData& Data)
 {
-	ProceduralMeshTris = Triangles;
+	//ensure that an equal number of positions, colors are present
+	if (Data.VertexPositions.Num() == Data.VertexColors.Num())
+	{
+		//check that all indecies in the triangle array are valid
+		for (auto Triangle : Data.Triangles)
+		{
+			if (!(Data.VertexColors.IsValidIndex(Triangle.Vertex0) &&
+				Data.VertexColors.IsValidIndex(Triangle.Vertex1) &&
+				Data.VertexColors.IsValidIndex(Triangle.Vertex2)))
+			{
+				return false;
+			}
+		}
 
-	UpdateCollision();
+		MeshData = Data;
 
-	// Need to recreate scene proxy to send it over
-	MarkRenderStateDirty();
+		UpdateCollision();
 
-	return true;
+		MarkRenderStateDirty();
+
+		return true;
+	}
+
+	return false;
 }
 
-void UProceduralMeshComponent::AddProceduralMeshTriangles(const TArray<FProceduralMeshTriangle>& Triangles)
+FProceduralMeshData& UProceduralMeshComponent::GetMeshData()
 {
-	ProceduralMeshTris.Append(Triangles);
-
-	// Need to recreate scene proxy to send it over
-	MarkRenderStateDirty();
+	return MeshData;
 }
+
+//bool UProceduralMeshComponent::SetProceduralMeshTriangles(const TArray<FProceduralMeshTriangle>& Triangles)
+//{
+//	ProceduralMeshTris = Triangles;
+//
+//	UpdateCollision();
+//
+//	// Need to recreate scene proxy to send it over
+//	MarkRenderStateDirty();
+//
+//	return true;
+//}
+
+//void UProceduralMeshComponent::AddProceduralMeshTriangles(const TArray<FProceduralMeshTriangle>& Triangles)
+//{
+//	ProceduralMeshTris.Append(Triangles);
+//
+//	// Need to recreate scene proxy to send it over
+//	MarkRenderStateDirty();
+//}
 
 void  UProceduralMeshComponent::ClearProceduralMeshTriangles()
 {
-	ProceduralMeshTris.Reset();
+	MeshData.ResetTriangles();
 
 	// Need to recreate scene proxy to send it over
 	MarkRenderStateDirty();
@@ -312,7 +371,7 @@ FPrimitiveSceneProxy* UProceduralMeshComponent::CreateSceneProxy()
 {
 	FPrimitiveSceneProxy* Proxy = NULL;
 	// Only if have enough triangles
-	if(ProceduralMeshTris.Num() > 0)
+	if(MeshData.TrianglesNum() > 0)
 	{
 		Proxy = new FProceduralMeshSceneProxy(this);
 	}
@@ -328,40 +387,44 @@ int32 UProceduralMeshComponent::GetNumMaterials() const
 FBoxSphereBounds UProceduralMeshComponent::CalcBounds(const FTransform & LocalToWorld) const
 {
 	// Only if have enough triangles
-	if(ProceduralMeshTris.Num() > 0)
+	if (MeshData.TrianglesNum() > 0)
 	{
 		// Minimum Vector: It's set to the first vertex's position initially (NULL == FVector::ZeroVector might be required and a known vertex vector has intrinsically valid values)
-		FVector vecMin = ProceduralMeshTris[0].Vertex0.Position;
+		FVector vecMin = MeshData.VertexPositions[MeshData.Triangles[0].Vertex0];
 
 		// Maximum Vector: It's set to the first vertex's position initially (NULL == FVector::ZeroVector might be required and a known vertex vector has intrinsically valid values)
-		FVector vecMax = ProceduralMeshTris[0].Vertex0.Position;
+		FVector vecMax = MeshData.VertexPositions[MeshData.Triangles[0].Vertex0];
 
 		// Get maximum and minimum X, Y and Z positions of vectors
-		for(int32 TriIdx = 0; TriIdx < ProceduralMeshTris.Num(); TriIdx++)
+		for (int32 TriIdx = 0; TriIdx < MeshData.TrianglesNum(); TriIdx++)
 		{
-			vecMin.X = (vecMin.X > ProceduralMeshTris[TriIdx].Vertex0.Position.X) ? ProceduralMeshTris[TriIdx].Vertex0.Position.X : vecMin.X;
-			vecMin.X = (vecMin.X > ProceduralMeshTris[TriIdx].Vertex1.Position.X) ? ProceduralMeshTris[TriIdx].Vertex1.Position.X : vecMin.X;
-			vecMin.X = (vecMin.X > ProceduralMeshTris[TriIdx].Vertex2.Position.X) ? ProceduralMeshTris[TriIdx].Vertex2.Position.X : vecMin.X;
+			const FVector &Vertex0 = MeshData.VertexPositions[MeshData.Triangles[TriIdx].Vertex0];
+			const FVector &Vertex1 = MeshData.VertexPositions[MeshData.Triangles[TriIdx].Vertex1];
+			const FVector &Vertex2 = MeshData.VertexPositions[MeshData.Triangles[TriIdx].Vertex2];
 
-			vecMin.Y = (vecMin.Y > ProceduralMeshTris[TriIdx].Vertex0.Position.Y) ? ProceduralMeshTris[TriIdx].Vertex0.Position.Y : vecMin.Y;
-			vecMin.Y = (vecMin.Y > ProceduralMeshTris[TriIdx].Vertex1.Position.Y) ? ProceduralMeshTris[TriIdx].Vertex1.Position.Y : vecMin.Y;
-			vecMin.Y = (vecMin.Y > ProceduralMeshTris[TriIdx].Vertex2.Position.Y) ? ProceduralMeshTris[TriIdx].Vertex2.Position.Y : vecMin.Y;
+			vecMin.X = (vecMin.X > Vertex0.X) ? Vertex0.X : vecMin.X;
+			vecMin.X = (vecMin.X > Vertex1.X) ? Vertex1.X : vecMin.X;
+			vecMin.X = (vecMin.X > Vertex2.X) ? Vertex2.X : vecMin.X;
 
-			vecMin.Z = (vecMin.Z > ProceduralMeshTris[TriIdx].Vertex0.Position.Z) ? ProceduralMeshTris[TriIdx].Vertex0.Position.Z : vecMin.Z;
-			vecMin.Z = (vecMin.Z > ProceduralMeshTris[TriIdx].Vertex1.Position.Z) ? ProceduralMeshTris[TriIdx].Vertex1.Position.Z : vecMin.Z;
-			vecMin.Z = (vecMin.Z > ProceduralMeshTris[TriIdx].Vertex2.Position.Z) ? ProceduralMeshTris[TriIdx].Vertex2.Position.Z : vecMin.Z;
+			vecMin.Y = (vecMin.Y > Vertex0.Y) ? Vertex0.Y : vecMin.Y;
+			vecMin.Y = (vecMin.Y > Vertex1.Y) ? Vertex1.Y : vecMin.Y;
+			vecMin.Y = (vecMin.Y > Vertex2.Y) ? Vertex2.Y : vecMin.Y;
 
-			vecMax.X = (vecMax.X < ProceduralMeshTris[TriIdx].Vertex0.Position.X) ? ProceduralMeshTris[TriIdx].Vertex0.Position.X : vecMax.X;
-			vecMax.X = (vecMax.X < ProceduralMeshTris[TriIdx].Vertex1.Position.X) ? ProceduralMeshTris[TriIdx].Vertex1.Position.X : vecMax.X;
-			vecMax.X = (vecMax.X < ProceduralMeshTris[TriIdx].Vertex2.Position.X) ? ProceduralMeshTris[TriIdx].Vertex2.Position.X : vecMax.X;
+			vecMin.Z = (vecMin.Z > Vertex0.Z) ? Vertex0.Z : vecMin.Z;
+			vecMin.Z = (vecMin.Z > Vertex1.Z) ? Vertex1.Z : vecMin.Z;
+			vecMin.Z = (vecMin.Z > Vertex2.Z) ? Vertex2.Z : vecMin.Z;
 
-			vecMax.Y = (vecMax.Y < ProceduralMeshTris[TriIdx].Vertex0.Position.Y) ? ProceduralMeshTris[TriIdx].Vertex0.Position.Y : vecMax.Y;
-			vecMax.Y = (vecMax.Y < ProceduralMeshTris[TriIdx].Vertex1.Position.Y) ? ProceduralMeshTris[TriIdx].Vertex1.Position.Y : vecMax.Y;
-			vecMax.Y = (vecMax.Y < ProceduralMeshTris[TriIdx].Vertex2.Position.Y) ? ProceduralMeshTris[TriIdx].Vertex2.Position.Y : vecMax.Y;
+			vecMax.X = (vecMax.X < Vertex0.X) ? Vertex0.X : vecMax.X;
+			vecMax.X = (vecMax.X < Vertex1.X) ? Vertex1.X : vecMax.X;
+			vecMax.X = (vecMax.X < Vertex2.X) ? Vertex2.X : vecMax.X;
 
-			vecMax.Z = (vecMax.Z < ProceduralMeshTris[TriIdx].Vertex0.Position.Z) ? ProceduralMeshTris[TriIdx].Vertex0.Position.Z : vecMax.Z;
-			vecMax.Z = (vecMax.Z < ProceduralMeshTris[TriIdx].Vertex1.Position.Z) ? ProceduralMeshTris[TriIdx].Vertex1.Position.Z : vecMax.Z;
-			vecMax.Z = (vecMax.Z < ProceduralMeshTris[TriIdx].Vertex2.Position.Z) ? ProceduralMeshTris[TriIdx].Vertex2.Position.Z : vecMax.Z;
+			vecMax.Y = (vecMax.Y < Vertex0.Y) ? Vertex0.Y : vecMax.Y;
+			vecMax.Y = (vecMax.Y < Vertex1.Y) ? Vertex1.Y : vecMax.Y;
+			vecMax.Y = (vecMax.Y < Vertex2.Y) ? Vertex2.Y : vecMax.Y;
+
+			vecMax.Z = (vecMax.Z < Vertex0.Z) ? Vertex0.Z : vecMax.Z;
+			vecMax.Z = (vecMax.Z < Vertex1.Z) ? Vertex1.Z : vecMax.Z;
+			vecMax.Z = (vecMax.Z < Vertex2.Z) ? Vertex2.Z : vecMax.Z;
 		}
 
 		FVector vecOrigin = ((vecMax - vecMin) / 2) + vecMin;	/* Origin = ((Max Vertex's Vector - Min Vertex's Vector) / 2 ) + Min Vertex's Vector */
@@ -379,13 +442,13 @@ bool UProceduralMeshComponent::GetPhysicsTriMeshData(struct FTriMeshCollisionDat
 {
 	FTriIndices Triangle;
 
-	for(int32 i = 0; i<ProceduralMeshTris.Num(); i++)
+	for (int32 i = 0; i<MeshData.TrianglesNum(); i++)
 	{
-		const FProceduralMeshTriangle& tri = ProceduralMeshTris[i];
+		const FProceduralMeshTriangle& tri = MeshData.Triangles[i];
 
-		Triangle.v0 = CollisionData->Vertices.Add(tri.Vertex0.Position);
-		Triangle.v1 = CollisionData->Vertices.Add(tri.Vertex1.Position);
-		Triangle.v2 = CollisionData->Vertices.Add(tri.Vertex2.Position);
+		Triangle.v0 = CollisionData->Vertices.Add(MeshData.VertexPositions[tri.Vertex0]);
+		Triangle.v1 = CollisionData->Vertices.Add(MeshData.VertexPositions[tri.Vertex1]);
+		Triangle.v2 = CollisionData->Vertices.Add(MeshData.VertexPositions[tri.Vertex2]);
 
 		CollisionData->Indices.Add(Triangle);
 		CollisionData->MaterialIndices.Add(i);
@@ -398,7 +461,7 @@ bool UProceduralMeshComponent::GetPhysicsTriMeshData(struct FTriMeshCollisionDat
 
 bool UProceduralMeshComponent::ContainsPhysicsTriMeshData(bool InUseAllTriData) const
 {
-	return (ProceduralMeshTris.Num() > 0);
+	return (MeshData.TrianglesNum() > 0);
 }
 
 void UProceduralMeshComponent::UpdateBodySetup()

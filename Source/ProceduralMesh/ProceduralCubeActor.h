@@ -10,7 +10,7 @@
  * 
  */
 UCLASS()
-class PROCEDURALMESH_API AProceduralCubeActor : public AActor
+class PROCEDURALMESH_API  AProceduralCubeActor : public AActor
 {
 	GENERATED_BODY()
 
@@ -21,5 +21,5 @@ public:
 	UPROPERTY(VisibleAnywhere, Category=Materials)
 	UProceduralMeshComponent* mesh;
 
-	void GenerateCube(const float& InSize, TArray<FProceduralMeshTriangle>& OutTriangles);
+	void GenerateCube(const float& InSize, FProceduralMeshData& OutData);
 };
